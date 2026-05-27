@@ -3,13 +3,17 @@ package com.bugsnag.gradle.android
 import com.bugsnag.gradle.BugsnagCliTask
 import com.bugsnag.gradle.dsl.VariantConfiguration
 import org.gradle.api.Project
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 internal abstract class CreateBuildTask : BugsnagCliTask() {
@@ -26,8 +30,9 @@ internal abstract class CreateBuildTask : BugsnagCliTask() {
     @get:InputFile
     abstract val androidManifestFile: RegularFileProperty
 
-    @get:Input
-    abstract val projectPath: Property<String>
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val projectDirectory: DirectoryProperty
 
     @TaskAction
     fun createBuild() {
@@ -44,7 +49,7 @@ internal abstract class CreateBuildTask : BugsnagCliTask() {
             "version-name" `=` variantMetadata.versionName
             "version-code" `=` variantMetadata.versionCode.map { it.toString() }
 
-            +projectPath.get().toString()
+            +projectDirectory.get().asFile.absolutePath
         }
     }
 

@@ -140,7 +140,7 @@ class GradlePlugin @Inject constructor(
             task.metadata.set(bugsnag.metadata)
             task.variantMetadata.configureFrom(bugsnag, variant)
             task.androidManifestFile.set(variant.manifestFile)
-            task.projectPath.set(task.project.projectDir.toString())
+            task.projectDirectory.set(target.layout.projectDirectory)
         }
 
     private fun configureUploadBundleTask(target: Project, bugsnag: VariantConfiguration, variant: AndroidVariant) =

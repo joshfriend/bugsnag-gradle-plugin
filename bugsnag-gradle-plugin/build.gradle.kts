@@ -1,4 +1,7 @@
 import org.gradle.api.attributes.plugin.GradlePluginApiVersion
+import org.gradle.plugins.signing.Sign
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("java-gradle-plugin")
     id("maven-publish")
@@ -12,8 +15,22 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-version = "${project.properties["VERSION_NAME"]}"
-group = "${project.properties["GROUP"]}"
+val pomName = providers.gradleProperty("POM_NAME")
+val pomDescription = providers.gradleProperty("POM_DESCRIPTION")
+val pomUrl = providers.gradleProperty("POM_URL")
+val pomLicenceName = providers.gradleProperty("POM_LICENCE_NAME")
+val pomLicenceUrl = providers.gradleProperty("POM_LICENCE_URL")
+val pomDeveloperId = providers.gradleProperty("POM_DEVELOPER_ID")
+val pomDeveloperName = providers.gradleProperty("POM_DEVELOPER_NAME")
+val pomScmConnection = providers.gradleProperty("POM_SCM_CONNECTION")
+val pomScmDevConnection = providers.gradleProperty("POM_SCM_DEV_CONNECTION")
+val pomScmUrl = providers.gradleProperty("POM_SCM_URL")
+
+version = providers.gradleProperty("VERSION_NAME").get()
+group = providers.gradleProperty("GROUP").get()
+
+val signingInMemoryKey = providers.gradleProperty("signingInMemoryKey")
+val signingInMemoryKeyPassword = providers.gradleProperty("signingInMemoryKeyPassword")
 
 dependencies {
     compileOnly(libs.android.plugin)
@@ -23,21 +40,25 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation(libs.mockito)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.9.1")
 }
 
 tasks.test {
     useJUnitPlatform()
 }
 
-kotlin {
-    jvmToolchain(17)
-}
-
 java {
+    sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-val bugsnagCliDir = File(rootProject.projectDir, "bugsnag-cli")
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+val bugsnagCliDir = layout.settingsDirectory.dir("bugsnag-cli")
 
 /**
  * makeCli builds all of the `bugsnag-cli` binaries allowing them to be directly included in the Gradle plugin
@@ -50,18 +71,18 @@ val makeCli = tasks.register<Exec>("makeCli") {
 
 tasks.processResources {
     dependsOn(makeCli)
-    from(File(bugsnagCliDir, "bin"))
+    from(bugsnagCliDir.dir("bin"))
 }
 
 gradlePlugin {
-    website.set(project.findProperty("POM_URL")?.toString())
-    vcsUrl.set(project.findProperty("POM_SCM_URL")?.toString())
+    website.set(pomUrl)
+    vcsUrl.set(pomScmUrl)
 
     plugins {
         create("bugsnagPlugin") {
             id = "com.bugsnag.gradle"
-            displayName = project.property("POM_NAME").toString()
-            description = project.property("POM_DESCRIPTION").toString()
+            displayName = pomName.get()
+            description = pomDescription.get()
             implementationClass = "com.bugsnag.gradle.GradlePlugin"
             tags.set(listOf("bugsnag", "proguard", "android", "upload"))
         }
@@ -81,7 +102,7 @@ listOf("runtimeElements", "apiElements").forEach { configurationName ->
 
 // license checking
 license {
-    header = rootProject.file("LICENSE")
+    header = layout.settingsDirectory.file("LICENSE").asFile
     ignoreFailures = true
 }
 
@@ -96,48 +117,52 @@ publishing {
             name = "ossrhStaging"
             url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
             credentials {
-                username = project.findProperty("NEXUS_USERNAME")?.toString() ?: System.getenv("NEXUS_USERNAME")
-                password = project.findProperty("NEXUS_PASSWORD")?.toString() ?: System.getenv("NEXUS_PASSWORD")
+                username = providers.gradleProperty("NEXUS_USERNAME")
+                    .orElse(providers.environmentVariable("NEXUS_USERNAME"))
+                    .orNull
+                password = providers.gradleProperty("NEXUS_PASSWORD")
+                    .orElse(providers.environmentVariable("NEXUS_PASSWORD"))
+                    .orNull
             }
         }
     }
 }
 
-afterEvaluate {
-    publishing.publications {
-        withType<MavenPublication> {
-            pom {
-                name.set(project.property("POM_NAME").toString())
-                description.set(project.property("POM_DESCRIPTION").toString())
-                url.set(project.property("POM_URL").toString())
+publishing.publications {
+    withType<MavenPublication>().configureEach {
+        pom {
+            name.set(pomName)
+            description.set(pomDescription)
+            url.set(pomUrl)
 
-                licenses {
-                    license {
-                        name.set(project.property("POM_LICENCE_NAME")?.toString())
-                        url.set(project.property("POM_LICENCE_URL")?.toString())
-                    }
+            licenses {
+                license {
+                    name.set(pomLicenceName)
+                    url.set(pomLicenceUrl)
                 }
+            }
 
-                developers {
-                    developer {
-                        id.set(project.property("POM_DEVELOPER_ID")?.toString())
-                        name.set(project.property("POM_DEVELOPER_NAME")?.toString())
-                    }
+            developers {
+                developer {
+                    id.set(pomDeveloperId)
+                    name.set(pomDeveloperName)
                 }
+            }
 
-                scm {
-                    connection.set(project.property("POM_SCM_CONNECTION")?.toString())
-                    developerConnection.set(project.property("POM_SCM_DEV_CONNECTION")?.toString())
-                    url.set(project.property("POM_SCM_URL")?.toString())
-                }
+            scm {
+                connection.set(pomScmConnection)
+                developerConnection.set(pomScmDevConnection)
+                url.set(pomScmUrl)
             }
         }
     }
 }
 
-afterEvaluate {
-    signing {
-        sign(publishing.publications["pluginMaven"])
+signing {
+    useInMemoryPgpKeys(signingInMemoryKey.orNull, signingInMemoryKeyPassword.orNull)
+    isRequired = signingInMemoryKey.isPresent
+    if (signingInMemoryKey.isPresent) {
+        sign(publishing.publications)
     }
 }
 
