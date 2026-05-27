@@ -1,3 +1,4 @@
+import org.gradle.api.attributes.plugin.GradlePluginApiVersion
 plugins {
     id("java-gradle-plugin")
     id("maven-publish")
@@ -63,6 +64,17 @@ gradlePlugin {
             description = project.property("POM_DESCRIPTION").toString()
             implementationClass = "com.bugsnag.gradle.GradlePlugin"
             tags.set(listOf("bugsnag", "proguard", "android", "upload"))
+        }
+    }
+}
+
+listOf("runtimeElements", "apiElements").forEach { configurationName ->
+    configurations.named(configurationName).configure {
+        attributes {
+            attribute(
+                GradlePluginApiVersion.GRADLE_PLUGIN_API_VERSION_ATTRIBUTE,
+                objects.named(GradlePluginApiVersion::class.java, libs.versions.minGradle.get())
+            )
         }
     }
 }

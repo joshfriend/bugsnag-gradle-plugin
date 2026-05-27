@@ -23,9 +23,9 @@ internal data class AndroidVariant(
      * not enabled for this variant.
      */
     val obfuscationMappingFile: Provider<RegularFile>?,
-    val versionName: Provider<String?>?,
-    val versionCode: Provider<Int?>?,
-    val applicationId: Provider<String?>?,
+    val versionName: Provider<String>?,
+    val versionCode: Provider<Int>?,
+    val applicationId: Provider<String>?,
     val dexClassesDir: Provider<Directory>?
 ) {
     val bundleTaskName: String
